@@ -11,4 +11,19 @@ dependencies = [
     "langgraph>=1.2.20",
     "langgraph-checkpoint-postgres>=3.2.0",
     "psycopg[binary,pool]>=3.3.8",
+    "pydantic-settings>=2.16.3",
+    "pytest>=9.2.0",
+    "uvicorn>=0.54.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "real_llm: calls the real model and spends tokens (run with: pytest -m real_llm)",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
 ]
