@@ -4,4 +4,26 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.162.5",
+    "langchain>=1.5.0",
+    "langchain-anthropic>=1.7.10",
+    "langgraph>=1.2.20",
+    "langgraph-checkpoint-postgres>=3.2.0",
+    "psycopg[binary,pool]>=3.3.8",
+    "pydantic-settings>=2.16.3",
+    "pytest>=9.2.0",
+    "uvicorn>=0.54.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "real_llm: calls the real model and spends tokens (run with: pytest -m real_llm)",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
