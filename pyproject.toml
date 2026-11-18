@@ -10,6 +10,7 @@ dependencies = [
     "langchain-anthropic>=1.7.10",
     "langgraph>=1.2.20",
     "langgraph-checkpoint-postgres>=3.2.0",
+    "langmem>=0.0.30",
     "psycopg[binary,pool]>=3.3.8",
     "pydantic-settings>=2.16.3",
     "pytest>=9.2.0",
