@@ -4,10 +4,8 @@ Usan el Postgres real (el del docker compose). Cada prueba corre dentro de una
 transacción que se revierte al final, así que no dejan datos ni tablas.
 Si la base de datos no está disponible, las pruebas se saltan en vez de fallar.
 """
-import psycopg
 import pytest
 from fastapi import HTTPException
-from psycopg.rows import DictRow, dict_row
 
 import db.postgress as p
 from models.models_api import CreateChat, PushChatHistory
@@ -15,29 +13,6 @@ from models.models_api import CreateChat, PushChatHistory
 pytestmark = pytest.mark.db
 
 CHAT = "test-chat"
-
-
-@pytest.fixture(scope="session")
-def database_is_up():
-    """Se comprueba una sola vez por ejecución, para no esperar el timeout en cada prueba."""
-    try:
-        psycopg.connect(p.DATABASE_URL, connect_timeout=3).close()
-    except psycopg.OperationalError:
-        return False
-    return True
-
-
-@pytest.fixture
-def conn(database_is_up):
-    if not database_is_up:
-        pytest.skip("Postgres no está disponible (levántalo con: docker compose up -d db)")
-    connection = psycopg.Connection[DictRow].connect(p.DATABASE_URL, row_factory=dict_row)
-    try:
-        p.create_tables(connection)
-        yield connection
-    finally:
-        connection.rollback()      # nada de lo que hizo la prueba se guarda
-        connection.close()
 
 
 @pytest.fixture
@@ -50,9 +25,7 @@ def chat(conn):
 
 
 def add_message(conn, chat_id, role, content, message_id=None):
-    data = PushChatHistory(
-        chat_id=chat_id, role=role, content=content, created_at="", message_id=message_id
-    )
+    data = PushChatHistory(chat_id=chat_id, role=role, content=content, message_id=message_id)
     return p.push_chat_history(data, conn)
 
 
@@ -74,6 +47,14 @@ def test_create_chat_returns_the_row_without_summary(conn):
     row = p.create_chat(CreateChat(chat_id=CHAT, name="Test"), conn)
 
     assert row == {"chat_id": CHAT, "name": "Test", "summary": None}
+
+
+def test_ensure_chat_creates_once_and_keeps_the_first_name(conn):
+    p.ensure_chat(CHAT, "First", conn)
+    p.ensure_chat(CHAT, "Second", conn)
+
+    rows = conn.execute("SELECT name FROM existing_chats WHERE chat_id = %s", (CHAT,)).fetchall()
+    assert rows == [{"name": "First"}]
 
 
 def test_create_chat_twice_is_409(conn):
@@ -175,6 +156,34 @@ def test_summary_does_not_touch_messages_of_another_chat(chat, conn):
     assert marked == 1
     assert p.get_history_chat("other-chat", conn)[0]["summarized"] is False
     assert get_summary(conn, "other-chat") is None
+
+
+# --- Memoria para el modelo ---
+def test_memory_of_unknown_chat_is_none(conn):
+    assert p.get_chat_memory("no-such-chat", conn) is None
+
+
+def test_memory_without_summary_has_every_message_pending(chat, conn):
+    memory = p.get_chat_memory(chat, conn)
+
+    assert memory["summary"] is None
+    assert memory["summarized_message_ids"] == []
+    assert memory["last_summarized_message_id"] is None
+    assert [row["content"] for row in memory["pending"]] == ["m0", "m1", "m2", "m3", "m4"]
+
+
+def test_memory_with_summary_has_only_unsummarized_messages_pending(chat, conn):
+    p.update_chat_history_with_summary(chat, "the summary", ["id-0", "id-1", "id-2"], conn)
+
+    memory = p.get_chat_memory(chat, conn)
+
+    assert memory["summary"] == "the summary"
+    assert memory["summarized_message_ids"] == ["id-0", "id-1", "id-2"]
+    assert memory["last_summarized_message_id"] == "id-2"
+    assert memory["pending"] == [
+        {"message_id": "id-3", "role": "assistant", "content": "m3"},
+        {"message_id": "id-4", "role": "user", "content": "m4"},
+    ]
 
 
 def test_summary_for_unknown_chat_is_404(conn):

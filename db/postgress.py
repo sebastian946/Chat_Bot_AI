@@ -1,6 +1,7 @@
+from typing import Any
 from urllib.parse import quote_plus
 from config.settings import settings
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from psycopg.rows import DictRow, dict_row
 from psycopg import errors
 import psycopg
@@ -13,13 +14,23 @@ DATABASE_URL = (
     f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB_NAME}"
 )
 
-def get_conn():
-    # Commits when the request ends well, rolls back if it raises.
+@contextmanager
+def open_conn():
+    """Connection for code outside FastAPI: `with open_conn() as conn:`.
+
+    Commits when the block ends well, rolls back if it raises.
+    """
     with psycopg.Connection[DictRow].connect(DATABASE_URL, row_factory=dict_row) as conn:
         yield conn
 
 
-def create_tables(conn: psycopg.Connection) -> None:
+def get_conn():
+    """Connection for FastAPI routes: `conn = Depends(get_conn)`."""
+    with open_conn() as conn:
+        yield conn
+
+
+def create_tables(conn: psycopg.Connection[Any]) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS existing_chats (
             chat_id TEXT PRIMARY KEY,
@@ -88,6 +99,48 @@ def create_chat(data: CreateChat, conn: psycopg.Connection[DictRow]) -> DictRow 
         ).fetchone()
     except errors.UniqueViolation:
         raise HTTPException(409, "Chat already exists")
+
+
+def get_chat_memory(chat_id: str, conn: psycopg.Connection[DictRow]) -> dict[str, Any] | None:
+    """What the model needs to continue a chat: its summary and the messages not covered by it.
+
+    Returns None if the chat does not exist. Otherwise a dict with:
+      summary                     the stored summary, or None
+      summarized_message_ids      ids of the messages the summary covers
+      last_summarized_message_id  id of the newest of those, or None
+      pending                     rows (message_id, role, content) still not summarized, oldest first
+    """
+    chat = conn.execute(
+        "SELECT summary FROM existing_chats WHERE chat_id = %s", (chat_id,)
+    ).fetchone()
+    if chat is None:
+        return None
+
+    rows = conn.execute(
+        "SELECT message_id, role, content, summarized FROM chat_history "
+        "WHERE id_chat = %s ORDER BY created_at, id",
+        (chat_id,),
+    ).fetchall()
+    summarized_ids = [row["message_id"] for row in rows if row["summarized"]]
+    return {
+        "summary": chat["summary"],
+        "summarized_message_ids": summarized_ids,
+        "last_summarized_message_id": summarized_ids[-1] if summarized_ids else None,
+        "pending": [
+            {"message_id": row["message_id"], "role": row["role"], "content": row["content"]}
+            for row in rows
+            if not row["summarized"]
+        ],
+    }
+
+
+def ensure_chat(chat_id: str, name: str, conn: psycopg.Connection[DictRow]) -> None:
+    """Create the chat if it does not exist yet; do nothing if it does."""
+    conn.execute(
+        "INSERT INTO existing_chats (chat_id, name) VALUES (%s, %s) "
+        "ON CONFLICT (chat_id) DO NOTHING",
+        (chat_id, name),
+    )
 
 
 def push_chat_history(data: PushChatHistory, conn: psycopg.Connection[DictRow]) -> DictRow | None:
