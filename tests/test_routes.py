@@ -1,8 +1,8 @@
-"""Pruebas de las rutas de la API.
+"""Tests for the API routes.
 
-Las rutas de base de datos usan el Postgres real dentro de la transacción que se
-revierte. La ruta de mensajes sustituye el grafo por una función falsa: aquí se
-comprueba la ruta, no el modelo (eso está en test_memory.py).
+The database routes use the real Postgres inside the transaction that is rolled
+back. The messages route replaces the graph with a stub: what is checked here is
+the route, not the model (that is covered in test_memory.py).
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -14,13 +14,13 @@ from main import app
 
 @pytest.fixture
 def client():
-    # Sin `with`: no se ejecuta lifespan, así que no hace falta la base para crear el cliente.
+    # No `with`: lifespan does not run, so the database is not needed to create the client.
     return TestClient(app)
 
 
 @pytest.fixture
 def db_client(client, conn):
-    """Cliente cuyas rutas usan la conexión de prueba, que se revierte al final."""
+    """Client whose routes use the test connection, which is rolled back at the end."""
     app.dependency_overrides[get_conn] = lambda: conn
     yield client
     app.dependency_overrides.clear()
@@ -32,7 +32,7 @@ def test_health(client):
     assert (response.status_code, response.json()) == (200, {"status": "ok"})
 
 
-# --- Chats e historial ---
+# --- Chats and history ---
 @pytest.mark.db
 def test_create_chat(db_client):
     response = db_client.post("/chats", json={"chat_id": "api-chat", "name": "My chat"})
@@ -72,7 +72,7 @@ def test_history_of_unknown_chat_is_404(db_client):
     assert response.status_code == 404
 
 
-# --- Mensajes ---
+# --- Messages ---
 QUESTION = {"user_name": "Ana", "prompt_user": "Who was Bolívar?", "topic": "history"}
 
 
@@ -89,7 +89,7 @@ def test_send_message_returns_the_answer(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"chat_id": "api-chat", "response_message": "the answer"}
-    assert calls == [("Who was Bolívar?", "history", "api-chat")]      # el chat_id es la conversación
+    assert calls == [("Who was Bolívar?", "history", "api-chat")]      # the chat_id is the conversation
 
 
 def test_send_message_with_invalid_topic_is_400(client, monkeypatch):

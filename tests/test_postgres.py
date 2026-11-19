@@ -1,8 +1,8 @@
-"""Pruebas de las funciones de base de datos.
+"""Tests for the database functions.
 
-Usan el Postgres real (el del docker compose). Cada prueba corre dentro de una
-transacción que se revierte al final, así que no dejan datos ni tablas.
-Si la base de datos no está disponible, las pruebas se saltan en vez de fallar.
+They use the real Postgres (the one from docker compose). Each test runs inside a
+transaction that is rolled back at the end, so they leave no data or tables behind.
+If the database is not reachable, the tests are skipped instead of failing.
 """
 import pytest
 from fastapi import HTTPException
@@ -17,7 +17,7 @@ CHAT = "test-chat"
 
 @pytest.fixture
 def chat(conn):
-    """Un chat con cinco mensajes, m0..m4, con ids id-0..id-4."""
+    """A chat with five messages, m0..m4, with ids id-0..id-4."""
     p.create_chat(CreateChat(chat_id=CHAT, name="Test"), conn)
     for i, role in enumerate(["user", "assistant", "user", "assistant", "user"]):
         add_message(conn, CHAT, role, f"m{i}", f"id-{i}")
@@ -35,11 +35,11 @@ def get_summary(conn, chat_id):
     ).fetchone()["summary"]
 
 
-# --- Tablas ---
+# --- Tables ---
 def test_create_tables_can_run_twice(conn):
-    p.create_tables(conn)      # el fixture ya la ejecutó una vez
+    p.create_tables(conn)      # the fixture already ran it once
 
-    assert p.get_history_chat  # llegar aquí sin error es la comprobación
+    assert p.get_history_chat  # getting here without an error is the check
 
 
 # --- Chats ---
@@ -65,7 +65,7 @@ def test_create_chat_twice_is_409(conn):
     assert error.value.status_code == 409
 
 
-# --- Mensajes ---
+# --- Messages ---
 def test_push_stores_the_message_as_not_summarized(conn):
     p.create_chat(CreateChat(chat_id=CHAT, name="Test"), conn)
 
@@ -106,7 +106,7 @@ def test_history_of_unknown_chat_is_404(conn):
     assert error.value.status_code == 404
 
 
-# --- Resumen ---
+# --- Summary ---
 def test_summary_is_saved_and_only_listed_messages_are_marked(chat, conn):
     marked = p.update_chat_history_with_summary(chat, "the summary", ["id-0", "id-1", "id-2"], conn)
 
@@ -158,7 +158,7 @@ def test_summary_does_not_touch_messages_of_another_chat(chat, conn):
     assert get_summary(conn, "other-chat") is None
 
 
-# --- Memoria para el modelo ---
+# --- Memory for the model ---
 def test_memory_of_unknown_chat_is_none(conn):
     assert p.get_chat_memory("no-such-chat", conn) is None
 
