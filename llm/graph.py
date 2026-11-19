@@ -278,22 +278,22 @@ def stream_response(model_input: ModelInput, thread_id: str = "console") -> str:
     config = thread_config(thread_id)
     previous_summary = graph.get_state(config).values.get("context", {}).get("running_summary")
     for update in graph.stream(model_input.model_dump(), config, stream_mode="updates"):
-        for nodo, salida in update.items():
-            if nodo == "init":
+        for node, output in update.items():
+            if node == "init":
                 # A summary restored from Postgres is not a new one.
-                previous_summary = salida.get("context", {}).get("running_summary", previous_summary)
-                if salida["greeting"]:
-                    print(f"[init] {salida['greeting']}")
-            elif nodo == "summarization":
-                summary = salida.get("context", {}).get("running_summary")
+                previous_summary = output.get("context", {}).get("running_summary", previous_summary)
+                if output["greeting"]:
+                    print(f"[init] {output['greeting']}")
+            elif node == "summarization":
+                summary = output.get("context", {}).get("running_summary")
                 if summary and summary != previous_summary:
                     print("[summarization] older messages were summarized")
-            elif nodo == "save_summary":
-                if salida:
+            elif node == "save_summary":
+                if output:
                     print("[save_summary] summary stored in Postgres")
             else:
-                answer = salida["messages"][-1].text
-                print(f"[{nodo}] {answer}")
+                answer = output["messages"][-1].text
+                print(f"[{node}] {answer}")
     return answer
 
 
