@@ -2,3 +2,4 @@
 .venv
 notas.txt
 manual
+__pycache__
