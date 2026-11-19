@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     POSTGRES_DB_NAME: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: SecretStr
-    POSTGRES_HOST: str
+    POSTGRES_HOST: str = "localhost"   # "db" when the app runs inside the compose network
     POSTGRES_PORT: int
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

@@ -23,6 +23,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "real_llm: calls the real model and spends tokens (run with: pytest -m real_llm)",
+    "db: needs the Postgres from docker compose; skipped when it is not reachable",
 ]
 
 [dependency-groups]
