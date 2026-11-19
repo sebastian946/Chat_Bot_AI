@@ -1,6 +1,8 @@
-def main():
-    print("Hello from chat-bot-ai!")
+from fastapi import FastAPI
+
+app = FastAPI(title="Chat Bot AI")
 
 
-if __name__ == "__main__":
-    main()
+@app.get("/health")
+def health():
+    return {"status": "ok"}

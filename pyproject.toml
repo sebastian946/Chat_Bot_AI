@@ -11,10 +11,11 @@ dependencies = [
     "langgraph>=1.2.20",
     "langgraph-checkpoint-postgres>=3.2.0",
     "langmem>=0.0.30",
+    "psycopg2-binary>=2.9.13",
     "psycopg[binary,pool]>=3.3.8",
     "pydantic-settings>=2.16.3",
     "pytest>=9.2.0",
-    "uvicorn>=0.54.0",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [tool.pytest.ini_options]
